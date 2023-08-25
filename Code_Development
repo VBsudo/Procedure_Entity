@@ -1,0 +1,45 @@
+SELECT TOP 5 HASHBYTES('MD5',CONCAT(SP.OrganizationID,SP.CenterID,'Athena',SP.ClinicalServiceID )) AS ProcedureBusinessKey
+, CONCAT(SP.OrganizationID,SP.CenterID,'Athena',SP.ClinicalServiceID ) AS ProcedureNaturalBusinessKey
+, SP.ContextID AS ContextID
+, SP.OrganizationID AS NetworkID
+, SP.CenterID AS CentreID
+, 'Athena' AS SourceSystemID
+, SP.ClinicalServiceProcedureCD AS ProcedureID
+--,P.PatientBusinessKey as PatientBusinessKey
+--,P.PatientNaturalBusinessKey as PatientNaturalBusinessKey
+--,E.EncounterBusinessKey as EncounterBusinessKey
+--,E.EncounterNaturalBusinessKey as EncounterNaturalBusinessKey
+--,PP.ProviderBusinessKey as ProviderBusinessKey
+--,PP.ProviderNaturalBusinessKey as ProviderNaturalBusinessKey
+--,SS.ServiceLocationBusinessKey as ServiceLocationBusinessKey
+--,SS.ServiceLocationNaturalBusinessKey as ServiceLocationNaturalBusinessKey
+, SUBSTRING(sp.ProcedureCD,1,5) AS ProcedureSourceCPTLookup
+, SP.ProcedureCD AS ProcedureCD
+, E.EncounterDTS AS ProcedureDTS
+, M.ModifierCD AS ProcedureModifier1CD
+, CAST(CASE WHEN SP.DeletedDTS IS NOT NULL THEN 'Y' ELSE 'N' END AS VARCHAR(1)) AS VoidedFLG
+--, CAST(CASE WHEN EP.ProcedureCD IS NOT NULL THEN 'Y' ELSE 'N'END AS VARCHAR(1)) AS EandMFLG
+,CAST(IIF(SP.ProcedureCD IN ('G0402','G0438','G0439'), 'Y', 'N') AS VARCHAR(1)) AS AnnualWellnessVisitFLG 
+,'Y' AS UDSQualifyingProcedureFLG 
+FROM Athena.Clinical.ServiceProcedure SP
+INNER JOIN Athena.Clinical.Service CS
+ON SP.ClinicalServiceID = CS.ClinicalServiceID AND SP.CenterID = CS.CenterID AND SP.OrganizationID = CS.OrganizationID
+INNER JOIN Athena.Encounter.Encounter E
+ON CS.ClinicalEncounterID = E.ClinicalEncounterID AND CS.CenterID = E.CenterID AND CS.OrganizationID = E.OrganizationID
+--INNER JOIN Athena.Person.Patient P
+--on E.PatientID = P.PatientID AND CS.CenterID = E.CenterID AND CS.OrganizationID = E.OrganizationID
+INNER JOIN Athena.Clinical.ServiceModifier M
+ON SP.ClinicalServiceProcedureCD = M.ClinicalServicePROCCodeID AND SP.CenterID = M.CenterID AND SP.OrganizationID = M.OrganizationID
+INNER JOIN Shared.Terminology.[Procedure] TP
+on SP.ProcedureCD = TP.ProcedureCD 
+INNER JOIN Acres.Patient.AllPatientUnMasked P
+ON CAST(E.PatientID AS VARCHAR) = CAST(P.PatientID AS VARCHAR) AND E.CenterID = P.CenterID AND E.OrganizationID = P.NetworkID
+INNER JOIN ACRES.Encounter.Encounter EE 
+ON CS.ClinicalEncounterID = EE.EncounterID AND CS.CenterID = EE.CenterID AND CS.OrganizationID = EE.NetworkID
+INNER JOIN Acres.Provider.Provider PP
+ON E.ProviderID=PP.ProviderID AND E.CenterID = PP.CenterID AND E.OrganizationID = PP.NetworkID
+INNER JOIN IDEA.Reference.EAndMProceduresCodes EP
+ON SP.ProcedureCD = EP.ProcedureCD 
+/*INNER JOIN Acres.ServiceLocation.ServiceLocation SS
+ON E.DepartmentID = SS.ServiceLocationID  AND E.CenterID = SS.CenterID AND E.OrganizationID = SS.NetworkID
+-- Servicelocation table cant see a field near to departmentid*/
